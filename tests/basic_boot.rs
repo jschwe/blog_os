@@ -4,8 +4,11 @@
 #![test_runner(blog_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use blog_os::println;
-use core::panic::PanicInfo;
+extern crate alloc;
+
+use alloc::string::String;
+use blog_os::serial_println;
+//use core::panic::PanicInfo;
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
@@ -14,12 +17,18 @@ pub extern "C" fn _start() -> ! {
     loop {}
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    blog_os::test_panic_handler(info)
+
+#[test]
+fn test_println() -> Result<(), String> {
+    serial_println!("test_println output");
+    Ok(())
 }
 
-#[test_case]
-fn test_println() {
-    println!("test_println output");
-}
+// #[test]
+// fn test_failure() -> Result<(), String> {
+//     serial_println!("test errored");
+//     // We can't actually alloc, so this panics at runtime.
+//     let s = String::from("some failure reason");
+//     serial_println!("created string");
+//     Err(s)
+// }

@@ -3,11 +3,14 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(test)]
 
 use core::panic::PanicInfo;
+extern crate test;
 
 pub mod serial;
-pub mod vga_buffer;
+
+use test::{TestDescAndFn, TestFn};
 
 pub trait Testable {
     fn run(&self) -> ();
@@ -24,12 +27,30 @@ where
     }
 }
 
-pub fn test_runner(tests: &[&dyn Testable]) {
+pub fn test_runner(tests: &[&TestDescAndFn]) {
     serial_println!("Running {} tests", tests.len());
+    let mut success = true;
     for test in tests {
-        test.run();
+        serial_println!("Running test `{}`:", test.desc.name.as_slice());
+        match test.testfn {
+            TestFn::StaticTestFn(test_fn) => match test_fn() {
+                Ok(()) => {
+                    serial_println!("test `{}` .. ok", test.desc.name.as_slice())
+                }
+                Err(msg) => {
+                    serial_println!("test `{}` .. failed:\n {}", test.desc.name.as_slice(), msg);
+                    success = false;
+                }
+            },
+            TestFn::StaticBenchFn(_) => unreachable!(),
+            TestFn::DynTestFn(_) => unreachable!(),
+            TestFn::DynBenchFn(_) => unreachable!(),
+        }
     }
-    exit_qemu(QemuExitCode::Success);
+    match success {
+        true => exit_qemu(QemuExitCode::Success),
+        false => exit_qemu(QemuExitCode::Failed),
+    }
 }
 
 pub fn test_panic_handler(info: &PanicInfo) -> ! {
@@ -61,10 +82,4 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 pub extern "C" fn _start() -> ! {
     test_main();
     loop {}
-}
-
-#[cfg(test)]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    test_panic_handler(info)
 }
